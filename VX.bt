@@ -1,0 +1,137 @@
+//------------------------------------------------
+//--- 010 Editor v14.0 Binary Template
+//
+//      File: VX.bt 
+//   Authors: Lizardy
+//   Version: 0.1
+//   Purpose: Identify and read the Actimagine Video Codec used by numerous CE devices.
+//  Category: Video
+// File Mask: 
+//  ID Bytes: 
+//   History:
+//   0.1     2024-10-07 Lizardy: Initial release.
+//------------------------------------------------
+
+// Format Specification:
+// magic "VXDS"
+// number of frames
+// frame width
+// frame height
+// unknown, possible offset to some data
+// frame rate
+// audio sample rate
+// audio channel count
+// max video frame size
+// audio start offset
+// video keyframe index offset
+// video keyframe count
+// packed video data (must decode first to decode audio)
+// packed audio data (16-bit aligned)
+// audio extradata (3124 bytes)
+// video stream information (two 32-bit words + video data start position)
+//
+// Frame information:
+// 16-bit size
+// 16-bit number of audio frames
+// 
+
+
+LittleEndian();
+
+// Forward declarations:
+
+struct Video;
+struct FixedRateVideoTrack;
+struct AudioTrack;
+struct FrameData;
+struct KeyFrame;
+
+// Constants:
+
+local int64 k_fSize = FileSize();
+
+// Enums:
+
+
+
+// Funtions:
+
+// Search for "VXDS"
+int64 FindVXDSStart(int64 pos)
+{
+    while (pos < k_fSize)
+    {
+        local char name[4];
+        ReadBytes(name,FTell(), 4);
+        Printf(name);
+        if (name == "VXDS")
+        {
+            return pos;
+        }
+        pos++;
+    }
+    return -1;
+}
+
+// Structs:
+
+typedef struct
+{
+    char header[4];
+
+    if (header != "VXDS")
+    {
+        Printf("Invalid VXDS header!\n");
+        Exit(-1);
+    }
+
+    FixedRateVideoTrack videoTrack;
+    AudioTrack audioTrack;
+    int32 maxFrameSize;
+    int32 audioOffset;
+    int32 keyFramesOffset;
+    int32 keyFrameCount;
+    FrameData frames[videoTrack.numFrames] <optimize=false>;
+    FSeek(keyFramesOffset);
+    KeyFrame keyFrames[keyFrameCount];
+} Video;
+
+typedef struct
+{
+    int32 numFrames;
+    int32 width;
+    int32 height;
+    int32 some_offset;
+    int32 fps;
+} FixedRateVideoTrack;
+
+typedef struct
+{
+    int32 sampleRate;
+    int32 channelCount;
+} AudioTrack;
+
+typedef struct
+{
+    int16 size;
+    int16 numAudioFrames;
+    // skipping data for now
+    byte data[size - 2];
+    //TODO: video data
+    // based on ITU H.264 w/ simplifications & enhancements for low-res coding
+    //TODO: audio data
+    // some variant of LPC
+    // 128-sample frames
+    // coded in 20/14/12/10 bytes
+    // + codebook data (3124 bytes) stored in the container
+} FrameData;
+
+typedef struct
+{
+    int32 frameNumber;
+    int32 dataOffset;
+} KeyFrame;
+
+// Main:
+
+Video video;
